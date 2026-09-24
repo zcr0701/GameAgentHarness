@@ -27,7 +27,7 @@ Ember Hollow（暂定名）是一款 Unity 6、侧视 2D、可破坏地形的高
 - [设计总览](docs/DESIGN.md) · [五层关卡](docs/LEVEL_DESIGN.md) · [程序与法术系统](docs/PROGRAM_SYSTEM.md)
 - [Agent Harness 架构](docs/architecture/ai-harness.md) · [游戏原语目录](docs/architecture/action-primitives.md) · [架构文档索引](docs/architecture/README.md)
 - [Pi Harness 源码研究](docs/PI_AGENT_HARNESS_RESEARCH.md) · [Noita 设计研究](docs/NOITA_RESEARCH.md)
-- [本地模型运行方案](docs/GOD_DIALOGUE.md) · [早期模型选型方案](本地模型选型与AI决策方案.md)
+- [本地模型运行方案](docs/GOD_DIALOGUE.md) · [早期模型选型方案](本地模型选型与AI决策方案.md) · [本科毕设选题方案](docs/references/本科毕设选题方案.md)
 - [游戏本地化](docs/LOCALIZATION.md) · [成就机制](docs/EASTER_EGG_MECHANIC.md)
 - [后续计划](TODO.md) · [协作记录](AGENTS.md) · [灵感备忘](灵感.MD)
 
