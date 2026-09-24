@@ -144,3 +144,4 @@ The full 1024×160 terrain is initialized and painted into one Tilemap with one 
 8. 新增玩家可见文本继续使用中文默认和英文同步，并经 `GameLocalization.T(中文, English)` 提供。
 
 The Windows build passed without C# warnings/errors. Ordinary player `-smokeTest` emitted `EMBER_HOLLOW_SMOKE_PASS`, covering the five-layer/four-stair route invariant and four-enemy victory loop. A single local SemIf Qwen3.5-4B NF4 F3 combo smoke emitted `GOD_ACTION_HARNESS_SMOKE_PASS: 组合成功：已命中锁定目标。`; the selected combo dealt damage to its locked target. Hands-on full-level traversal, jump feel, enemy navigation, and target-device performance remain to be tested or measured.
+

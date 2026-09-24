@@ -40,7 +40,7 @@
   → HUD 提示成功/暂缓/拒绝/未命中；控制台记录 request ID、选项和验收证据
 ```
 
-F3 当前只提供 `faultline_charge` 与不执行的 `hold`。聊天开头明确含 `<作弊码>` 时，Unity 根据请求文本筛出一组已注册的创世候选，再走相同的受限概率评分链；当前目录包括地图爆破、刷怪门、冲击波、回响风暴、无限能量和钻脉。所有参数仍由 Unity 固定，模型响应不包含坐标、`ModuleKind` 数组、伤害/半径/能源字段。创世入口支持 Unity 主控的最多 3 步有界流程，不是通用工具调用或自由构造计划；确切行为和限制见原语目录。
+F3 当前只提供 `faultline_charge` 与不执行的 `hold`。聊天开头明确含 `<作弊码>` 时，Unity 根据请求文本筛出一组已注册的创世候选，再走相同的受限概率评分链；候选包括地图爆破、刷怪门、强敌配置、黑洞、限时、撤销、隐藏 Harness 房材料填充和试炼生物生成。所有参数仍由 Unity 固定/夹紧，模型响应不包含 `ModuleKind` 数组或任意 Unity API。创世入口支持最多10步有界流程，不是通用工具调用或自由构造计划；确切行为和限制见原语目录。
 
 ## 受 Pi 公开 Agent Harness 启发的做法
 
@@ -64,7 +64,7 @@ Pi 是架构研究对象，不是本项目的运行时依赖。参考的是控�
   → Unity 对玩家对象/位置/生命、RunToken、地形队列、UI 与服务状态重新校验
   → 生成不可变参数 step/hash，在 sandbox 数据投影上预演并检查本步断言
   → 通过后主线程执行相同 step，再观测实机断言；记录 sandbox/live 双证据
-  → 若候选仍未尝试、最多 3 步且没有活动弹体/地形工作，则用新世界快照继续评分
+  → 若候选仍未尝试、最多10步且没有冲突中的工作，则用新世界快照继续评分
   → 失败、hold、finish_task、超时、取消、游戏结束或安全门不通过都停止本任务
   → 汇总每一步回执；全部候选尝试且所有验收通过才把任务记为通过
 ```
@@ -93,7 +93,15 @@ AI 预演由 `HarnessSandboxChamber` 持有，和真实世界共处一个 Unity 
              → 捕获新快照，再决定后续步骤
 ```
 
-对于“无穷无尽的强大敌人”，Unity 先只提供 `endless_enemy_portal`；实机确认门户存在且至少一次刷新成功后，下一轮才提供 `set_portal_strong_profile`。第二步调整门户后，必须观察新生成敌人并检查生命、接触伤害、移速和刷新间隔。任一断言失败，目标不从剩余列表移除，最终任务不能报通过。现阶段仍是固定 ID 和 Unity 固定参数驱动的最多 3 步流程，并非模型生成多条任意脚本。
+对于“无穷无尽的强大敌人”，Unity 先只提供 `endless_enemy_portal`；实机确认门户存在且至少一次刷新成功后，下一轮才提供 `set_portal_strong_profile`。第二步调整门户后，必须观察新生成敌人并检查生命、接触伤害、移速和刷新间隔。任一断言失败，目标不从剩余列表移除，最终任务不能报通过。现阶段仍是固定 ID 和 Unity 固定参数驱动的最多10步流程，并非模型生成多条任意脚本。
+
+### 黑洞与材料粒子验收
+
+`BlackHoleSpell` 由 `create_black_hole_spell` 预备，再由 `set_black_hole_duration` 启动。宏观格每块按8×8、64个细粒子计算；受损块按占据掩码剩余粒子数计数。硬度只约束普通伤害；黑洞无视硬度，直接拆散吸入所有材料和基岩。吞噬粒子推动半径增长；全图放逐目标使用无限时长并按12 Unity units/s扩张到地图边界。普通黑洞默认5秒，限时范围为1–60秒。活动期间暂停材料移动和刷怪门，地形按每帧最多4096格分批重复扫描，避免半径增长或移动地形造成漏检；敌人按位置和存活状态查询并吸入。有限操作结束后恢复模拟，无限操作吞噬完成后保持活动，两个状态都可用完整快照撤销。
+
+Sandbox 在独立数据投影上验证参数、范围边界和撤销快照。无限放逐可投影为全图归零；有限时长黑洞的局部命中范围未知，因此回执明确要求正式世界实时复核，不把它伪报成全图清空。正式世界随后重放同一个 step/hash 并按实时结果验收。`BlackHoleSpell.Undo()` 恢复宏观材料、稀疏细粒子掩码、材料索引和敌人位置/激活状态，再恢复刷怪门。黑洞视觉轨迹是直线吸附，但粒子系统每帧最多发出512个表现样本；所有粒子都计入逻辑吞噬计数，VFX 数不等于物理粒子总数。该实现不为每颗粒子创建 `GameObject` 或 `Rigidbody2D`。
+
+`fill_*` 材料原语、`fill_particle_cluster` 和 `spawn_harness_creature` 被限制到镜头外的隐藏 Harness 房，供验收前造样本。它们由 `GridTerrain` 统一更新宏观格、64位掩码、材料索引和 Tilemap。当前黑洞操作有自身完整快照撤销；普通填充和试炼生物没有单独的 undo ID，需在通用副作用进入 DSL 前补齐事务 journal。Sandbox 预演仍是状态数据投影，不模拟 TilemapCollider、细粒子流动或完整 Unity 物理。
 
 `StateRevision` 目前只在本次运行中检查快照新鲜度；每步有参数规范串、hash 和验收回执，但没有持久化 JSONL journal 或崩溃恢复。门户/无限能量等少数持续效果能关闭，地图挖掘、爆破和敌人受伤还没有完整逆操作；因此现状**不具备所有动作可撤销的保证**。以下可撤销准入规则是后续 DSL 的硬门槛。
 
@@ -192,7 +200,7 @@ def create_strong_endless_enemies():
 5. 对玩家进程加独立测试：真实本地评分、合法候选、重验证、实际游戏结果、玩家程序存档不变。
 6. 再同步本文、[游戏操作原语目录](action-primitives.md)、模块索引、`DESIGN.md` 与 `AGENTS.md`。不要先向模型开放可任意组合模块、坐标、数值或 C# 方法的工具。
 
-当前有运行期 `StateRevision` 和任务内 script hash/步骤回执，但没有持久化 JSONL action journal、崩溃恢复、动态通用 tool registry、完整物理分区、整段多步 DSL 预演或通用 undo 栈。创世循环严格受 3 步和 150 秒限制。`requestSequence`、步骤回执与 HUD 状态只服务当前会话。版本化持久化须保持 Unity 数据为事实来源，并先补齐逆操作协议。
+当前有运行期 `StateRevision` 和任务内 script hash/步骤回执，但没有持久化 JSONL action journal、崩溃恢复、动态通用 tool registry、完整物理分区、整段多步 DSL 预演或通用 undo 栈。创世循环严格受10步和150秒限制。`requestSequence`、步骤回执与 HUD 状态只服务当前会话。黑洞专属快照可撤销；填充和试炼生物仍待独立逆操作。版本化持久化须保持 Unity 数据为事实来源，并先补齐逆操作协议。
 
 ## 验证清单
 
@@ -209,6 +217,8 @@ def create_strong_endless_enemies():
 - 另做正常 `-smokeTest -modelSmokeTest` 检查聊天路径，保证文本生成和决策端点共享模型锁但协议不同。
 - `-smokeTest -contextCompactionSmokeTest` 验证真实模型自动整理旧消息、只留最近 8 条原文，并完成后续 `/chat` 与普通游戏 smoke。
 - `-harnessSandboxSmokeTest` 验证密室结构、隐藏成就触发与持久化、`J` 成就页暂停/恢复和英文标签、隔离数据预演、强敌缺少传送门前置条件时拒绝、过期 revision 拒绝和实机状态不变。该检查已在最新 Windows 构建上通过；实际碰撞和窗口视觉布局仍需人工试玩检查。
+- `-blackHolePhysicsSmokeTest` 检查岩石硬度阈值、普通有限黑洞无视硬度吞噬范围内基岩与材料、8×8粒子计数、局部生物吸入及撤销；`-creationBlackHoleSmokeTest` 用真实本地模型验收“世界放逐到虚空”的原语选择、create→duration、Sandbox/live 回执和无限版全图归零。
+- 普通 `-smokeTest` 的历史结果见构建记录。黑洞物理 smoke 按当前普通有限时长语义检查样本材料局部吞噬、半径增长和 snapshot 精确恢复；全图吸入仅由无限变体 smoke 验收。黑洞 VFX 按512粒/帧采样；当前运行没有GPU图形设备，因此截图/视觉手感仍需实机检查。
 - 人工按 F3 并观察暂停/恢复、目标命中、暂缓/错误状态和中英文 HUD。模型端分数不是胜率指标。
 
 ## 参考链接
@@ -217,3 +227,4 @@ def create_strong_endless_enemies():
 - [Pi Agent 扩展文档](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md)
 - [Pi 上下文压缩文档](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/compaction.md)
 - [Pi 容器化和权限边界说明](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/containerization.md)
+

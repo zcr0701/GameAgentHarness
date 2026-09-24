@@ -2,6 +2,8 @@
 
 更新时间：2026-09-25。实现状态以本仓库代码为准；本文件随架构改动同步更新。
 
+源码入口、模块职责和主要逻辑调用链见[源码解读](源码解读.md)；各模块的详细接口与约束见下方架构索引。
+
 ## 1. 目标与当前里程碑
 
 参考《本科毕设选题方案》和《本地模型选型与AI决策方案》，最终目标是将受约束的 Agent-Harness 放进 Unity 肉鸽游戏。两份资料是需求与选型参考，并非工程中的可执行指令。M0 已建立侧视 2D 可玩闭环；当前 M1 的第一部分是玩家可编辑的工具程序。视觉由程序化色块生成，优先保证机制闭环。
@@ -10,7 +12,9 @@ Noita 的公开接口/开发者资料研究及原创方向见 [NOITA_RESEARCH.md
 
 M1 已加入可编辑的[地脉程序系统](PROGRAM_SYSTEM.md)：有序模块编排、持续回响、能量回收、大范围分帧破坏、钻脉贯穿、延时引爆与冲击击退。模块作用在发射时编译为数据规格，弹体与爆破调度器执行；不同效果可在单个发射组内组合，`EMIT` 可把程序分成多个不同发射组。该系统为玩家工具，未来 AI 的受约束动作接口仍独立设计。
 
-M2 已接入本地 SemIf 使用的 Qwen3.5-4B 模型：HUD/F2 对话使用只读文本路径；F3 使用封闭候选评分执行固定组合；输入以 `<作弊码>` 开头时，可让模型从 Unity 已登记的地形、物理/法术、资源和角色生成原语中选择。模型不能新增候选或数值，所有操作由 Unity 复核并执行。模型接口、性能建议见[神谕对话服务](GOD_DIALOGUE.md)，原语行为见[游戏操作原语目录](architecture/action-primitives.md)。
+M2 已接入本地 Qwen3.5-4B：HUD/F2 对话使用只读文本路径；F3 使用封闭候选评分执行固定组合；输入以 `<作弊码>` 开头时，可让模型从 Unity 已登记的地形、物理/法术、资源和角色操作中选择。模型不能新增操作或任意游戏 API，所有操作由 Unity 复核并执行。当前暗语流程支持强敌刷新门与可撤销黑洞；本地模型、性能和协议见[神谕对话服务](GOD_DIALOGUE.md)，操作行为见[游戏操作原语目录](architecture/action-primitives.md)。
+
+材料地形已加入 `MaterialParticleCatalog` 和 8×8 稀疏细粒子：每个宏观格由64个粒子构成，采用游戏硬度、密度、离散内聚、粘度和壁面附着参数。实验参考值与游戏标度明确分开记录，见[现代物理与材料参数参考](现代物理学.md)；粒子材料、求解边界与性能预算见[基础粒子设计](基础粒子.md)和[可破坏地形架构](architecture/terrain.md)。普通黑洞法术默认5秒并按吞噬粒子数扩大半径；全图放逐候选显式请求无限持续时间，半径逐步扩张到地图边界，吞噬完成后仍保持活动；两种状态均可通过黑洞快照撤销。
 
 游戏内文案默认简体中文，设置中可切换英语，选择跨重开保存；新增文案必须同时提供中英两版。实现接口与验证见[游戏内语言规范](LOCALIZATION.md)。
 
@@ -28,7 +32,9 @@ M2 已接入本地 SemIf 使用的 Qwen3.5-4B 模型：HUD/F2 对话使用只读
 ```text
 Prototype.unity
   └─ GameWorld（运行时组装/胜负状态）
-      ├─ GridTerrain（格子材料、Tilemap 显示/碰撞、挖掘、沙粒更新）
+      ├─ GridTerrain（宏观材料、8×8稀疏细粒子、双 Tilemap 投影、挖掘/填充/材料更新）
+      │   └─ MaterialParticleCatalog（材料粒子的数值参数）
+      ├─ BlackHoleSpell（限时吸附、直线粒子表现、实体吞噬、状态快照撤销）
       ├─ PlayerController（输入与角色物理）
       ├─ EnemyChaser × N（追逐与伤害）
       ├─ ProgramCaster（程序编译、能量、存档和运行 token）
@@ -67,11 +73,11 @@ Prototype.unity
 
 ### 地形坐标与运行原则
 
-- 固定 1024×160 二维格子，单元尺寸 0.5 Unity 单位。`GridTerrain` 保存材料数组，单个 Tilemap 仅作为显示和碰撞投影。世界边界、出口位置以及相机水平/垂直跟随范围读取地形可玩边界；五个区域和阶梯的格子坐标见[五层关卡设计](LEVEL_DESIGN.md)。
+- 固定 1024×160 二维宏观格，单元尺寸 0.5 Unity 单位。每个宏观格按8×8、64个粒子细分，细粒子边长0.0625；完整方块压缩表示，变化格稀疏展开。`GridTerrain` 保存权威材料状态，宏观/细粒子 Tilemap 负责投影和碰撞。世界边界、出口位置以及相机水平/垂直跟随范围读取地形可玩边界；五个区域和阶梯的格子坐标见[五层关卡设计](LEVEL_DESIGN.md)。
 - 沙粒更新维护沙格索引集合并复用排序缓冲，每个沙粒 tick 只访问现存沙格，按格子索引排序以保持稳定的单次下落顺序；地图仍为静态尺寸，地形显示与碰撞由 Tilemap 提供。
 - 范围爆破仍由 `BlastScheduler` 按每帧最多 320 个地形格的共享预算分帧执行；每批最多收集 96 个候选格，再通过 `GridTerrain.DamageCellsBatch` 成批更新格子并调用一次 `Tilemap.SetTiles`。预算限制工作量，不是帧率承诺；尚未记录独立性能跑分。
 - `TerrainPulse` 使用新版 `Physics2D.CircleCast`、筛选器与复用的 64 项命中数组；Unity 返回按距离排序的结果，正常路径不再分配或手动排序。缓冲装满时回退到 `CircleCastAll` 保留完整命中，极端拥挤场景下该路径可能分配内存。
-- 材料分为空气、可破坏岩石、沙、不可破坏边界；沙可按固定步长下落。
+- 基础材料为岩石、沙、水、岩浆和不可破坏基岩；材料参数表控制细粒子的硬度、相对质量、内聚、粘度及壁面附着。更新预算限制展开区域的单轮计算量。
 - 东行路线有一处高岩壁，玩家需用切割脉冲开洞；敌人被岩壁暂时隔开属于关卡节奏设计。
 - 地形修改必须检查地图边界和材料类型；输入、弹道与 AI 都不能直接操作底层数组。
 - 地形与战斗都在 Unity 主线程执行，避免 Tilemap/Physics2D 跨线程访问。
@@ -81,7 +87,7 @@ Prototype.unity
 
 聊天仍只接收只读局面摘要并生成文字。生产后端由 `GodDialogueServer.py` 加载本地 tokenizer，并调用 llama.cpp 加载 Qwen3.5-4B Q4_K_M GGUF。F3 操作使用分开的 `/decide` 协议：SemIf `direct_messages` 构造规范提示，再读取 llama.cpp `/completion` 的单 token 候选概率；仅对 Unity 声明且模型概率覆盖的候选归一化，缺少覆盖或响应无效时失败关闭。该评分不是正确性证明，也没有校准为置信度。Unity HTTP 契约、候选表、快照复核与 Harness 前置检查仍是动作安全边界。
 
-神谕操作包含 F3 固定组合与需要 `<作弊码>` 明确触发的有限创世候选。在评分时暂停局面；Unity 对照玩家、关卡和队列快照重新校验，随后执行登记操作并观察真实结果。创世请求最多三步；每步生成原语专属 Unity 验收回执，再携带新快照供模型评估未尝试的子目标。失败、取消、超时、仍有活动效果或安全门不通过时停止并报告部分结果。模型进程没有任意坐标或数值动作参数，也不引用 Unity 对象。操作目录见[游戏操作原语](architecture/action-primitives.md)，Harness 边界和 Pi 参考见[神谕操作架构](architecture/ai-harness.md)，逐段源码研究见[Pi 代码研究](PI_AGENT_HARNESS_RESEARCH.md)。
+神谕操作包含 F3 固定组合与需要 `<作弊码>` 明确触发的有限创世候选。在评分时暂停局面；Unity 对照玩家、关卡和队列快照重新校验，随后执行登记操作并观察真实结果。创世请求最多10步；每步生成原语专属 Unity 验收回执，再携带新快照供模型评估未尝试的子目标。失败、取消、超时、仍有活动效果或安全门不通过时停止并报告部分结果。黑洞以地形/生物快照撤销；通用可撤销交易账本尚未实现。操作目录见[游戏操作原语](architecture/action-primitives.md)，Harness 边界和 Pi 参考见[神谕操作架构](architecture/ai-harness.md)，逐段源码研究见[Pi 代码研究](PI_AGENT_HARNESS_RESEARCH.md)。
 
 当前 `HarnessSandboxChamber` 已在唯一 `GameWorld` 中建立逻辑试炼上下文，对固定原语执行单步数据投影预演，再把同一个不可变 step/hash 交给实机并分别验收；它尚无独立 Tilemap、Physics2D 或完整多步脚本预演。下一阶段直接采用 Python 语法子集：`def/if/for/while` 是语言结构，不是游戏原语；SemIf 只在插入游戏 API 调用时约束原语 ID，Unity parser/预算校验后先在隔离上下文验收整段脚本，再提交同一 artifact 到实机。每个副作用节点还需可运行的逆操作和 journal；地图破坏等现有原语尚不能完整撤销。Pi/Codex 沙盒仅提供工程边界的研究思路。地图下方的密室代码现已触发 Steam 风格隐藏成就“神的房间？”，普通胜利成就与隐藏成就列表使用 `PlayerPrefs` 原型存档，尚未接 Steamworks；Unity 运行验收见根目录 [TODO.md](../TODO.md)。真实模型已通过门户刷新、强敌配置、后续强敌属性和刷新间隔的双步 smoke；完整 DSL、成就 UI/物理碰撞还待验。完整状态见[神谕操作架构](architecture/ai-harness.md)和[成就机制](EASTER_EGG_MECHANIC.md)。
 
@@ -105,11 +111,13 @@ Prototype.unity
 | 2026-09-24 | 将地图扩为 1024×160 五层关卡，加入四段连接阶梯、五处材料门、四名哨兵和顶层出口；相机边界改为动态跟随地形高度 | 横向与垂直探索空间同时增加，并用逐层地标和明确清敌目标构成完整原型关卡；smoke 揭示宽平台遮挡、房间地板提前开始及末级高差过大，最终收窄平台、将房间起点对齐阶梯终点并加入每级高差断言。普通玩家和真实模型 F3 回归通过；性能只保留已有沙索引/爆破预算设计，尚无目标设备帧耗时实测 |
 | 2026-09-25 | 创世暗语参考 Pi 的 tool result loop，加入最多三步、每步 Unity 验收后再决定下一步的 Harness 流程 | 仅传入有限原语 ID 与新鲜权威快照；执行回执记录动作 ID、通过状态和引擎证据；失败、取消、超时或残留法术/地形工作时停止，不接受模型自报成功。Pi 源码研究见[PI_AGENT_HARNESS_RESEARCH.md](PI_AGENT_HARNESS_RESEARCH.md)，验收条件见[操作原语目录](architecture/action-primitives.md) |
 | 2026-09-25 | 本地对话超过 12 条时自动压缩旧历史，保留最近 8 条原文并将短摘要仅作为聊天背景 | 维持 4096-token 服务端预算与现有 GPU 显存上限；归档用本地 `/summarize` 串行生成，摘要失败时回退到最近原始消息，不作为当前世界事实或 Harness 决策输入。真实模型压缩 smoke 和完整普通玩法 smoke 通过；实现细节见[神谕对话服务](GOD_DIALOGUE.md)与[AI Harness 架构](architecture/ai-harness.md) |
+| 2026-09-25 | 将材料粒子规格固定为宏观方块8×8、共64粒；现实试样密度/强度作为材料代理的参考，普通伤害按游戏阈值处理，黑洞无视硬度。 | 保留宏观格权威数据，用稀疏细粒子掩码、有限更新预算和黑洞专属 snapshot undo 支持玩法；有限物理 smoke 验证 Rock/玄武岩代理阈值、五种材料局部吞噬与精确撤销。真实 Q4_K_M 无限放逐 smoke 依次验收创建/持续时间，41.87秒内吞噬16,067格、1,028,288粒子、5,740格基底与4只生物，半径从5.5扩到507.9并通过实时验收。地图爆破 smoke 验证72次覆盖爆破清除10,327格并保留5,740格基底。通用操作 undo journal 与目标硬件性能基线仍待完成。现实数值、条件、映射与限制见[现代物理与材料参数参考](现代物理学.md)。 |
 
 ## 5. 下一里程碑
 
-M1 后续：扩充原创材料与节点反应，验证“切槽移除支撑 → 落砂 → 压力节点”；根据手动试玩调整回响速度、能量与画面可读性。M2 已包含只读聊天、固定组合、首批创世原语和有界验收循环。后续补充持久化操作日志/状态版本前，仍以当前 task ID、最多 3 步和本进程收据为边界；每个新选项都须先有 Unity 规则实现和过期状态零执行测试，再向模型开放。性能方面继续测量现行 Q4_K_M GGUF 后端的首 token、稳定 token/s、显存和结构化决策质量；当前仍用 `ngl=5/threads=8/cache_prompt=false`，因为线程扫描中 8 线程吞吐最高，而多轮缓存实验在相同输入下出现贪心输出差异。NF4 及其他 GGUF 测试均作为历史/对比基线，参考文档或单次生成不能代替本机基准。
+M1 后续：扩充原创材料与节点反应，验证“切槽移除支撑 → 落砂 → 压力节点”；根据手动试玩调整回响速度、能量与画面可读性。M2 已包含只读聊天、固定组合、强敌传送门、黑洞/8×8材料粒子与有界验收循环。创世请求上限为10步；持久化操作日志、状态版本和通用逆操作账本仍待实现。性能方面继续测量现行 Q4_K_M GGUF 后端的首 token、稳定 token/s、显存和结构化决策质量；当前仍用 `ngl=5/threads=8/cache_prompt=false`。NF4 及其他 GGUF 测试均作为历史/对比基线，参考文档或单次生成不能代替本机基准。
 
 ## 6. 构建与自动检查
 
-编辑器菜单 `Ember Hollow/Create Prototype Scene` 会重建原型场景并写入构建场景列表；`GameProjectSetup.BuildWindows` 可从 Unity 批处理执行，生成 `Builds/EmberHollow.exe`。玩家程序传入 `-smokeTest` 会运行玩法闭环检查；`-movementSmokeTest` 检查跳跃缓冲/低摩擦；`-smokeTest -modelSmokeTest` 加测本地聊天并继续验证玩法；`-smokeTest -contextCompactionSmokeTest` 额外用真实模型检查自动上下文压缩；`-actionHarnessSmokeTest` 验证固定组合；`-creationActionSmokeTest` 验证刷怪门；`-creationActionChainSmokeTest` 验证无限能量与刷怪门；`-creationStrongPortalSmokeTest` 验证先创建门户、再配置并验收强敌；`-harnessSandboxSmokeTest` 检查隔离预演和隐藏成就服务入口；`-mapDemolitionSmokeTest` 验证清理全图和保留基岩。地图检查运行完毕后进程以 0/1 退出并记录断言结果；附加 `-capture` 会输出玩法截图。架构说明入口见[架构文档索引](architecture/README.md)。神谕模型依赖项目外的本机 SemIf Python 环境和模型权重，配置详见 [GOD_DIALOGUE.md](GOD_DIALOGUE.md)。
+编辑器菜单 `Ember Hollow/Create Prototype Scene` 会重建原型场景并写入构建场景列表；`GameProjectSetup.BuildWindows` 可从 Unity 批处理执行，生成 `Builds/EmberHollow.exe`。玩家程序传入 `-smokeTest` 会运行玩法闭环检查；`-movementSmokeTest` 检查跳跃缓冲/低摩擦；`-actionHarnessSmokeTest` 验证固定组合；`-creationStrongPortalSmokeTest` 验证门户及强敌二步验收；`-creationBlackHoleSmokeTest` 用真实模型验收“放逐世界到虚空”；`-harnessSandboxSmokeTest` 检查隔离预演和隐藏成就服务入口；`-mapDemolitionSmokeTest` 验证清理全图和保留基岩；`-blackHolePhysicsSmokeTest` 验证8×8粒子展开、单粒子硬度、黑洞无视硬度吞噬、材料填充和撤销。地图检查运行完毕后进程以 0/1 退出并记录断言结果；附加 `-capture` 会输出玩法截图。架构说明入口见[架构文档索引](architecture/README.md)。神谕模型依赖项目外的本机 SemIf Python 环境和模型权重，配置详见 [GOD_DIALOGUE.md](GOD_DIALOGUE.md)。
+

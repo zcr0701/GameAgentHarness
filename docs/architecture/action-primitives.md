@@ -1,6 +1,6 @@
 # 游戏操作原语目录
 
-更新时间：2026-09-25。本文区分玩家可编排的法术模块与神谕可调用的游戏操作；“原语”在两层中的权限和参数含义不同。
+更新时间：2026-09-25。本文区分玩家可编排的法术模块与神谕可调用的游戏操作；“原语”在两层中的权限和参数含义不同。当前暗语 Harness 逐步选择已登记 ID，没有执行任意 Python 脚本。
 
 ## 两层指令系统
 
@@ -42,7 +42,7 @@
 
 仅提交不可变脚本 artifact，不把试炼舱里已改动的地形/物件移动到实机。正式执行前重验输入世界版本，发现快照过期则重新预演；实机结果也要复验，因为玩家世界会与沙盒状态出现差异。沙盒预演不替代实机撤销；所有会改状态的正式节点必须提供真实 `undo/compensation` handler 和 journal，否则不得进入可撤销 registry。无限周期行为必须有停止路径、生成速率和存活上限，并能撤销已生成的实体。
 
-当前 Unity `/decide` 仍只在固定候选 ID 中选择，创世流程最多 3 步。`HarnessSandboxChamber` 把 Unity 固定参数编译成不可变单步 artifact/hash，在数据投影上预演后，再由实机执行器重放并分别验收；它还没有 SemIf 游戏调用 ID 约束头、Python 语法子集解释器、完整多步隔离试炼或通用撤销栈。本节描述目标设计，不得把单步数据预演写成完整物理沙盒。
+当前 Unity `/decide` 仍只在固定候选 ID 中选择，创世流程最多10步。`HarnessSandboxChamber` 把 Unity 固定参数编译成不可变单步 artifact/hash，在数据投影上预演后，再由实机执行器重放并分别验收；它还没有 Python 语法子集解释器、完整多步隔离试炼或通用撤销栈。本节描述目标设计，不得把单步数据预演写成完整物理沙盒。
 
 ## 神谕世界操作
 
@@ -56,9 +56,15 @@
 | `infinite_energy` | 资源规则 | 暂时跳过玩家法术和回响的能量扣除；不修改储能上限或玩家已保存程序 | 持续生效，按 `X` 关闭 | `ProgramCaster.CheatInfiniteEnergyEnabled` 为真 | `ProgramCaster` |
 | `endless_enemy_portal` | 角色/生成 | 放在当前层安全落脚点；每 3 秒尝试生成一只敌人，同场存活上限 8 | 持续生成，按 `X` 关闭传送门 | 传送门仍活动且本次观察到刷新；已有门需有历史刷新记录 | `GameWorld` → `EnemySpawnPortal` |
 | `set_portal_strong_profile` | 角色/属性 | 将现有刷怪门设为强敌 profile；存活上限和刷新间隔沿用门户注册参数 | 门关闭时拒绝；按 `X` 可关闭持续生成 | 至少观察一只新刷出的强敌，并核对生命、接触伤害、移速与刷新间隔 | `GodActionHarness` → `EnemySpawnPortal` / `EnemyChaser` |
+| `create_black_hole_spell` | 地形/材料/法术 | 在地图内指定中心与初始半径创建黑洞；每块按8×8展开为64粒子；按每帧4096宏观格预算扫描 | 准备阶段不改地形；随后 `set_black_hole_duration` 启动。普通法术默认半径5.5 Unity units | 准备状态、初始半径、8×8规格和无副作用投影回执 | `GodActionHarness` → `GameWorld` → `BlackHoleSpell` |
+| `set_black_hole_duration` | 地形/材料/吸附 | 启动黑洞；吞噬粒子使半径按 `0.05 × sqrt(已吞噬粒子数)` 增长，无视材料硬度吞噬作用范围内材料/基岩与生物 | 普通法术默认5秒、上限60秒；全图放逐目标将时长设为无限，并以12 Unity units/s扩张到地图边界。有限结束后或按 `X` 撤销；无限吞噬完成后仍活动，可用快照撤销 | 有限版实时检查局部材料/基岩吸收、增长半径和撤销快照；无限版额外检查全图格/粒子/基岩/生物归零；与 snapshot 撤销结果对照 | `GodActionHarness` → `BlackHoleSpell` → `GridTerrain` |
+| `undo_last_black_hole` | 撤销/快照 | 恢复上一次黑洞保存的全地形材料/粒子快照、敌人位置/启用状态并恢复门户 | 单次撤销；没有可用黑洞快照时拒绝 | 还原前后宏观格/粒子/生物数量一致，Tilemap/碰撞同步 | `GodActionHarness` → `BlackHoleSpell.Undo` → `GridTerrain.RestoreSnapshot` |
+| `fill_rock_blocks` / `fill_sand_blocks` / `fill_water_blocks` / `fill_magma_blocks` / `fill_bedrock_blocks` | 试炼填充/材料 | 向镜头外隐藏 Harness 房填入指定材料块；数量和范围固定受限 | 当前仅定位在 Harness 房；此类填充没有独立的通用撤销原语 | Sandbox 投影数量、实机隐藏房材料数量和对应材料索引 | `GodActionHarness` → `GameWorld` → `GridTerrain.FillBlocks` |
+| `fill_particle_cluster` | 试炼填充/粒子 | 在隐藏 Harness 房生成受限材料粒子簇；本例按一个块64粒子展开 | 仅隐藏 Harness 房；可由后续黑洞操作整体快照撤销 | 细粒子数量、材料 ID 与占据掩码验证 | `GodActionHarness` → `GameWorld` → `GridTerrain.FillParticle` |
+| `spawn_harness_creature` | 试炼填充/生物 | 在隐藏 Harness 房生成有限、已注册强度档的测试生物 | 仅隐藏 Harness 房；当前没有独立的通用删除/撤销 ID | 生物活动状态、位置和强度档查询 | `GodActionHarness` → `GameWorld` → `EnemyChaser` |
 | `hold` | 无操作/拒绝执行 | 不执行游戏操作 | 立即结束 | 引擎世界状态无副作用；存在已完成步骤时整项任务标记部分完成 | `GodActionHarness` |
 
-当前创世操作的自然语言匹配只决定哪些已注册 ID 有资格进入本次候选表；数值固定在 Unity 代码中。不可匹配、否定或空目标不应获得世界操作候选。一个请求最多执行 3 步，模型每轮只选择一个未尝试候选；单步数据预演通过后立即交给实机执行器，实机回执用于决定下一步。失败、取消、超时、未尝试候选或仍有活动法术时停止并显示部分结果。模型的自述不算成功。当前只有步骤 hash 与任务期回执，没有持久化 undo journal；地图破坏、爆破和敌人伤害等副作用目前不能完整撤销。扩展流程与后续可撤销准入条件见[神谕操作 Harness](ai-harness.md)。
+当前创世操作的自然语言匹配只决定哪些已注册 ID 有资格进入本次候选表；参数固定或夹紧在 Unity 代码中。不可匹配、否定或空目标不应获得世界操作候选。一个请求最多执行10步，模型每轮只选择一个未尝试候选；单步数据投影预演通过后交给实机执行器，实机回执用于决定下一步。失败、取消、超时、未尝试候选或仍有活动法术时停止并显示部分结果。模型的自述不算成功。黑洞具备地形/敌人快照撤销；刷怪门/无限能量可关闭；填充操作当前仅限隐藏房但没有独立撤销原语；地图爆破、普通挖掘和敌人伤害没有通用持久化 undo journal。不可撤销项尚未达到用户要求的通用事务架构，后续应在扩大 DSL 前补齐。扩展流程与可撤销准入条件见[神谕操作 Harness](ai-harness.md)。
 
 ## 通用调用契约
 
@@ -71,8 +77,11 @@
 
 ## 已完成验证
 
+新增黑洞回归：`-blackHolePhysicsSmokeTest` 验证8×8/64粒子、岩石7次1点伤害保留64粒且第8次只破坏1粒；普通5秒黑洞在有限范围吞噬岩石、沙、水、岩浆、基岩样本和生物，随后快照精确撤销。`-creationBlackHoleSmokeTest` 用本地 Q4_K_M 模型处理“帮我将这个世界放逐到虚空”，验收 create→duration 两步、全图/基岩/粒子/生物归零和实时回执。
+
 2026-09-25 Unity Windows 构建无 C# 错误/警告；`-movementSmokeTest` 通过。当前 llama.cpp Q4_K_M GGUF 生产后端的玩家进程 `-smokeTest -modelSmokeTest -actionHarnessSmokeTest` 通过，选择 `faultline_charge` 并命中锁定目标；standalone `/chat`、`/decide`、`/cancel`、`/shutdown` 检查通过。模型运行配置 `ngl=5`、`ctx=4096`、`parallel=1`、`flash-attn=auto`，额外显存约 0.8 GiB。真实模型 `-creationActionSmokeTest` 选择 `endless_enemy_portal`，等待 3 秒后场上敌人从 4 增至 5 并关闭传送门。真实模型 `-creationStrongPortalSmokeTest` 先生成并验证门户，再切换强敌 profile 并验证后续刷新；两只门属敌人均为强敌（最小生命 12、接触伤害 2、移速 3.2），刷新间隔 3 秒，双步骤都有 sandbox/live 回执和 hash。`-harnessSandboxSmokeTest` 覆盖预演隔离、强敌前置条件和 stale revision fail-closed。真实模型 `-mapDemolitionSmokeTest` 选择 `demolish_map`，将可破坏格从 10,250 清到 0，基岩格保持 5,740。其余创世操作的代码有固定参数与执行路径，但还没有各自的独立真实模型 smoke。此前 Transformers NF4 / SemIf `direct.score` 的结果属于历史基线。
 
 ## 扩展与验证
 
 增加原语时，先补目录行和冻结的 ID/参数/授权边界，再实现 Unity 规则、快照字段、取消语义、结果事件与双语文本。验证非法候选、过期快照、未选择项零副作用、上限和取消；若涉及地形或物理，运行真实玩家进程而非只测 HTTP 响应。分派边界见根目录 `AGENTS.md`，完整 Harness 调用图见[神谕操作 Harness](ai-harness.md)。
+

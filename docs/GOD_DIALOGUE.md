@@ -168,3 +168,4 @@ Python 服务可由开发者单独启动以排查模型问题：
 | 2026-09-25 | 跳跃/摩擦与暗语创世原语 | Windows 构建、`-movementSmokeTest`、真实模型 `-creationActionSmokeTest` 和 `-mapDemolitionSmokeTest` 通过。确认 0.12 秒跳跃缓冲、0.1 秒离地宽限、玩家/地形零摩擦材质；刷怪门 3 秒一只、存活上限 8；全图测试将可破坏格 10,250 清到 0，基岩维持 5,740。 |
 | 2026-09-25 | token 生成测量与初步结论 | sidecar 将 chat 首 token/解码速率和 `/decide` 前向用时回传 Unity；一次真实模型聊天测得输入 212、输出 35、TTFT 1.267 秒、6.84 token/s、总生成 6.237 秒；一次决策 258 输入 token、前向 1.0595 秒。测量仅为单次样本；运行日志确认 FLA/causal-conv1d 缺失并回退 PyTorch，Triton 未找到 CUDA Toolkit。先做隔离快算子兼容性测试，再 A/B GGUF；未动外部 SemIf 环境。 |
 | 2026-09-24 | 玩法 smoke 稳定性修复 | 大范围测试此前复用前序开挖坐标，模型集成运行时出现“cast 已接受但 0.35 秒内未观察到爆破”。将测试发射点移到未被前序用例修改的地面，并为 smoke 断言增加逐项失败日志；最新 Windows 构建、普通玩法 smoke、聊天/玩法 smoke 和真实模型组合 smoke 全部通过 |
+

@@ -70,3 +70,4 @@ ProgramEditor 输入
 - 在模型端拼装组合数组，或者把单 token 候选评分误认为执行校验。
 - 增加模块后仍用旧的固定耗能常量；本项目用 `FaultlineChargeEnergyCost` 从编译器计算。
 - 将所有 `Emit` 修饰理解成“影响整串程序”；当前规则是修饰到最近的下一个 `Emit`。
+

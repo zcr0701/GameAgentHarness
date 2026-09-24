@@ -8,6 +8,7 @@
 | --- | --- | --- | --- |
 | 关卡与角色 | `GameWorld.cs`、`PlayerController.cs`、`EnemyChaser.cs` | [关卡与角色](world-and-actors.md) | Sol 定接口；清楚的单文件可交 Luna |
 | 地形 | `GridTerrain.cs` | [地形数据与物理投影](terrain.md) | Sol；数据/碰撞一致性跨模块 |
+| 材料与细粒子 | `MaterialParticleCatalog.cs`、`GridTerrain.cs`、`BlackHoleSpell.cs` | [基础粒子设计](../基础粒子.md)、[现实物理与材料参数](../现代物理学.md)、[地形数据与物理投影](terrain.md) | Sol；粒子、碰撞与撤销跨模块 |
 | 法术程序编译 | `ProgramCaster.cs`、`ProgramEditor.cs` | [程序编译器与编辑器](program-compiler.md) | Sol 定语义；单文件 UI 可交 Luna |
 | 法术命中与爆破 | `TerrainPulse.cs`、`BlastScheduler.cs`、`BlastVisual.cs` | [法术执行流水线](spell-execution.md) | Sol 负责跨模块执行与验证 |
 | 本地模型与游戏操作 Harness | `GodDialogueService.cs`、`GodDialogueServer.py`、`GodActionHarness.cs`、`HarnessSandboxChamber.cs` | [神谕操作 Harness](ai-harness.md)、[游戏操作原语目录](action-primitives.md) | Sol 负责协议、授权边界与验证 |
@@ -18,11 +19,12 @@
 
 1. 阅读根目录 [README.md](../../README.md)，建立运行和构建方式的概念。
 2. 阅读 [DESIGN.md](../DESIGN.md)，了解当前游戏结构、里程碑和全局约束。
-3. 按待改文件打开对应模块页；先核对模块页中的“当前实现”，不要把“扩展建议”误当成已有代码。
-4. 涉及玩家可见文案时，遵循 [本地化规范](../LOCALIZATION.md)：中文默认，新增文本同时提供英文并使用 `GameLocalization.T`。
-5. 涉及模型操作时，先读 [神谕操作 Harness](ai-harness.md)；模型排序不构成授权，最终规则检查和执行必须留在 Unity 主线程。
-6. 涉及法术 DSL 或 AI 操作 ID 时，再读[游戏操作原语目录](action-primitives.md)，不要混淆两层权限。
-7. 改完同步模块页、[DESIGN.md](../DESIGN.md) 与根目录 [AGENTS.md](../../AGENTS.md)，并记录实际构建/玩家进程检查结果。
+3. 阅读[源码解读](../源码解读.md)快速定位职责、入口和调用链。
+4. 按待改文件打开对应模块页；先核对模块页中的“当前实现”，不要把“扩展建议”误当成已有代码。
+5. 涉及玩家可见文案时，遵循 [本地化规范](../LOCALIZATION.md)：中文默认，新增文本同时提供英文并使用 `GameLocalization.T`。
+6. 涉及模型操作时，先读 [神谕操作 Harness](ai-harness.md)；模型排序不构成授权，最终规则检查和执行必须留在 Unity 主线程。
+7. 涉及法术 DSL 或 AI 操作 ID 时，再读[游戏操作原语目录](action-primitives.md)，不要混淆两层权限。
+8. 改完同步源码导读、模块页、[DESIGN.md](../DESIGN.md) 与根目录 [AGENTS.md](../../AGENTS.md)，并记录实际构建/玩家进程检查结果。
 
 待办与验收状态见根目录 [TODO.md](../../TODO.md)；普通/隐藏成就、密室触发与隔离规则见[机制说明](../EASTER_EGG_MECHANIC.md)。
 
@@ -36,3 +38,4 @@
 - 跨文件流程可以在多个模块页中用链接交叉引用；数据所有权和写入权只在其唯一权威模块详细定义。
 - 记录“当前实现”时引用仓库代码和实测；提案用“建议”或“后续”标注。
 - 外部实现只作为架构研究材料，不复制其代码、素材或专有内容。Pi 的公开 Agent Harness 研究结论见 [神谕操作 Harness](ai-harness.md)。
+
