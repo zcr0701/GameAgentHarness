@@ -1,10 +1,14 @@
-# GameAgentHarness Demo（暂定名 Ember Hollow）
+# 《神谕》/VATES Demo
+
 
 ## 简体中文
 
+
 这是 Windows x64 可运行 Demo。解压后保持文件结构，启动 `EmberHollow.exe`。
 
+
 ### 操作
+
 
 - A / D：移动
 - 空格：跳跃
@@ -14,29 +18,26 @@
 - F2：神谕对话；F3：请求神谕组合；J：成就；R：重开
 - 右上角“设置”可在简体中文和英语之间切换
 
+
 本 Demo 展示侧视 2D 关卡、可破坏地形、可组合的法术程序和基础战斗。当前公开包不含 Unity/C#/Python 项目源码，也不含本地大模型、模型运行环境或 AI sidecar；因此 F2 对话与 F3 神谕决策服务暂不可用。普通游戏操作无需模型。
+
 
 ### 问题反馈
 
+
 请在公开仓库提交 Issue：<https://github.com/zcr0701/GameAgentHarness/issues>
+
 
 ## English
 
+
 This is a runnable Windows x64 demo. Extract the archive without changing its folder layout, then launch `EmberHollow.exe`.
 
+
 ### Controls
+
 
 - A / D: move
 - Space: jump
 - Aim with the mouse; hold the left mouse button to run the current spell program
 - Tab: open or close the spell editor
-- X: stop a sustained spell or echo
-- F2: oracle chat; F3: request an oracle combo; J: achievements; R: restart
-- Use Settings in the upper-right corner to switch between Simplified Chinese and English
-
-The demo shows a side-view 2D level, destructible terrain, combinable spell programs, and basic combat. The public package contains no Unity/C#/Python project source, local model weights, model runtime, or AI sidecar. Oracle chat (F2) and AI decisions (F3) are therefore unavailable in this package. Core gameplay does not require a model.
-
-### Feedback
-
-Open an issue in the public repository: <https://github.com/zcr0701/GameAgentHarness/issues>
-
